@@ -17,8 +17,9 @@ function randomPositionInMap()
 end
 
 function love.load()
+    -- imagem vida
+    vidas = love.graphics.newImage('sprites/heart.png')
     -- Carregamento de bibliotecas e configurações iniciais
-
     -- Carrega a biblioteca Windfield para física
     wf = require 'libraries/windfield'
     world = wf.newWorld(0, 0) -- Cria um novo mundo de física
@@ -41,8 +42,10 @@ function love.load()
 
     player.collider:setFixedRotation(true)                                                             -- Faz com que a colisão do jogador não gire
     player.lives = 3                                                                                   -- Define a quantidade de vidas do jogador
-    player.x = (gameMap.width * gameMap.tilewidth) / 2                                                   -- Posição inicial X do jogador (centro do mapa)
-    player.y = (gameMap.height * gameMap.tileheight) / 2                                                                                      -- Posição inicial Y do jogador
+    player.x = (gameMap.width * gameMap.tilewidth) /
+    2                                                                                                  -- Posição inicial X do jogador (centro do mapa)
+    player.y = (gameMap.height * gameMap.tileheight) /
+    2                                                                                                  -- Posição inicial Y do jogador
     player.speed = 80                                                                                  -- Velocidade de movimento do jogador
     player.width = 48                                                                                  -- Largura do jogador
     player.height = 64                                                                                 -- Altura do jogador
@@ -107,13 +110,15 @@ function love.load()
     orbitRadius = 100
 
     -- Velocidade de rotação das esferas
-    orbitSpeed = 1
+    orbitSpeed = 0.5
 
     -- Carrega a imagem da esfera
     orbImage = love.graphics.newImage('sprites/orbs.png')
 
     -- Posição inicial do ângulo
     angle = 0
+
+    contadorMortes = 0
 
     -- Cria as esferas
     for i = 1, numOrbs do
@@ -124,140 +129,161 @@ function love.load()
         orb.speed = orbitSpeed
         table.insert(orbs, orb)
     end
+
+    -- Variável para controlar a pausa
+    isPaused = false
 end
 
+local isPaused = false
+local colorTimer = 0
+local colorDuration = 0.5             -- Duração em segundos para a mudança de cor
+local originalColor = { 255, 255, 255 } -- Cor original do jogador
+
 function love.update(dt)
-    -- Atualizações de lógica do jogo
+    if not isPaused then
+        -- Atualizações de lógica do jogo vão aqui dentro
 
-    local isMoving = false -- Flag para verificar se o jogador está se movendo
+        local isMoving = false -- Flag para verificar se o jogador está se movendo
 
-    local vx = 0
-    local vy = 0
+        local vx = 0
+        local vy = 0
 
+        -- Movimentação do jogador
+        if love.keyboard.isDown("d") then
+            vx = player.speed
+            player.anim = player.animations.right
+            isMoving = true
+        end
 
-    -- Movimentação do jogador
-    if love.keyboard.isDown("d") then
-        vx = player.speed
-        player.anim = player.animations.right
-        isMoving = true
-    end
+        if love.keyboard.isDown("a") then
+            vx = player.speed * -1
+            player.anim = player.animations.left
+            isMoving = true
+        end
 
-    if love.keyboard.isDown("a") then
-        vx = player.speed * -1
-        player.anim = player.animations.left
-        isMoving = true
-    end
+        if love.keyboard.isDown("s") then
+            vy = player.speed
+            player.anim = player.animations.down
+            isMoving = true
+        end
 
-    if love.keyboard.isDown("s") then
-        vy = player.speed
-        player.anim = player.animations.down
-        isMoving = true
-    end
+        if love.keyboard.isDown("w") then
+            vy = player.speed * -1
+            player.anim = player.animations.up
+            isMoving = true
+        end
 
-    if love.keyboard.isDown("w") then
-        vy = player.speed * -1
-        player.anim = player.animations.up
-        isMoving = true
-    end
+        player.collider:setLinearVelocity(vx, vy)
 
-    player.collider:setLinearVelocity(vx, vy)
+        -- Atualiza a animação do jogador se ele não estiver se movendo
+        if isMoving == false then
+            player.anim:gotoFrame(2)
+        end
 
-    -- Atualiza a animação do jogador se ele não estiver se movendo
-    if isMoving == false then
-        player.anim:gotoFrame(2)
-    end
+        player.anim:update(dt) -- Atualiza a animação do jogador
 
-    player.anim:update(dt) -- Atualiza a animação do jogador
-
-    -- Movimentação dos inimigos e verificação de colisões
-    for i = #enemies, 1, -1 do
-        local enemy = enemies[i]
-        if enemy and enemy.live then
-            local dx = player.x + player.width / 2 - enemy.x
-            local dy = player.y + player.height / 2 - enemy.y
-            local distance = math.sqrt(dx * dx + dy * dy)
-            if distance > 0 then
-                enemy.x = enemy.x + dx / distance * enemy.speed * dt
-                enemy.y = enemy.y + dy / distance * enemy.speed * dt
-            end
-            enemy.anim:update(dt) -- Atualiza a animação do inimigo
-
-            -- Verifica colisão entre o jogador e o inimigo apenas se ainda não ocorreu uma colisão
-            if not enemy.collided and isColliding(player.x, player.y, player.width, player.height, enemy.x, enemy.y, enemy.width, enemy.height) then
-                player.lives = player.lives - 1
-                enemy.collided = true -- Marca que ocorreu uma colisão com este inimigo
-                enemy.live = false    -- Define que o inimigo não está mais vivo
-
-                if player.lives <= 0 then
-                    love.event.quit()    -- Encerra o jogo se o jogador ficar sem vidas
+        -- Movimentação dos inimigos e verificação de colisões
+        for i = #enemies, 1, -1 do
+            local enemy = enemies[i]
+            if enemy and enemy.live then
+                local dx = player.x + player.width / 2 - enemy.x
+                local dy = player.y + player.height / 2 - enemy.y
+                local distance = math.sqrt(dx * dx + dy * dy)
+                if distance > 0 then
+                    enemy.x = enemy.x + dx / distance * enemy.speed * dt
+                    enemy.y = enemy.y + dy / distance * enemy.speed * dt
                 end
-                table.remove(enemies, i) -- Remove o inimigo da tabela
+                enemy.anim:update(dt) -- Atualiza a animação do inimigo
+
+                -- Verifica colisão entre o jogador e o inimigo apenas se ainda não ocorreu uma colisão
+                if not enemy.collided and isColliding(player.x, player.y, player.width, player.height, enemy.x, enemy.y, enemy.width, enemy.height) then
+                    player.lives = player.lives - 1
+                    enemy.collided = true -- Marca que ocorreu uma colisão com este inimigo
+                    enemy.live = false    -- Define que o inimigo não está mais vivo
+
+                    -- Altera a cor da sobreposição quando o jogador perde uma vida
+                    love.graphics.setColor(love.math.colorFromBytes(255, 100, 100, 150))
+
+                    -- Inicia o temporizador para restaurar a cor normal
+                    colorTimer = colorDuration
+                    if player.lives <= 0 then
+                        love.event.quit()    -- Encerra o jogo se o jogador ficar sem vidas Mudar aqui quando morrer
+                    end
+                    table.remove(enemies, i) -- Remove o inimigo da tabela
+                end
             end
         end
-    end
 
-    -- Atualiza o ângulo das esferas
-    angle = angle + orbitSpeed * dt
-    for i, orb in ipairs(orbs) do
-        orb.angle = orb.angle + orb.speed * dt
-        orb.x = player.x + math.cos(orb.angle + angle) * orbitRadius
-        orb.y = player.y + math.sin(orb.angle + angle) * orbitRadius
-    end
+        -- Atualiza o ângulo das esferas
+        angle = angle + orbitSpeed * dt
+        for i, orb in ipairs(orbs) do
+            orb.angle = orb.angle + orb.speed * dt
+            orb.x = player.x + math.cos(orb.angle + angle) * orbitRadius
+            orb.y = player.y + math.sin(orb.angle + angle) * orbitRadius
+        end
 
-    -- Atualização do mundo de física
-    world:update(dt)
+        -- Atualização do mundo de física
+        world:update(dt)
 
-    -- Atualização da posição do jogador
-    player.x = player.collider:getX() - player.width + 8 / 2
-    player.y = player.collider:getY() - player.height - 9 / 2
+        -- Atualização da posição do jogador
+        player.x = player.collider:getX() - player.width + 8 / 2
+        player.y = player.collider:getY() - player.height - 9 / 2
 
-    -- Atualização da câmera
-    cam:lookAt(player.x, player.y)
+        -- Atualização da câmera
+        cam:lookAt(player.x, player.y)
 
-    -- Limitação da câmera aos limites do mapa
-    local w = love.graphics.getWidth()
-    local h = love.graphics.getHeight()
+        -- Limitação da câmera aos limites do mapa
+        local w = love.graphics.getWidth()
+        local h = love.graphics.getHeight()
 
-    if cam.x < w / 2 then
-        cam.x = w / 2
-    end
+        if cam.x < w / 2 then
+            cam.x = w / 2
+        end
 
-    if cam.y < h / 2 then
-        cam.y = h / 2
-    end
+        if cam.y < h / 2 then
+            cam.y = h / 2
+        end
 
-    local mapW = gameMap.width * 64
-    local mapH = gameMap.height * 64
+        local mapW = gameMap.width * 64
+        local mapH = gameMap.height * 64
 
-    if cam.x > (mapW - w / 2) then
-        cam.x = (mapW - w / 2)
-    end
+        if cam.x > (mapW - w / 2) then
+            cam.x = (mapW - w / 2)
+        end
 
-    if cam.y > (mapH - h / 2) then
-        cam.y = (mapH - h / 2)
-    end
+        if cam.y > (mapH - h / 2) then
+            cam.y = (mapH - h / 2)
+        end
 
-    -- Fisica das bolhas para matar o enemy
-    -- Verifica colisões entre orbs e inimigos
-    for i = #orbs, 1, -1 do
-        local orb = orbs[i]
-        for j = #enemies, 1, -1 do
-            local enemy = enemies[j]
-            if enemy and orb and enemy.live then
-                if isCollidingOrbs(orb.x, orb.y, enemy.x, enemy.y, orbImage:getWidth() / 2, enemy.width / 2) then
-                    -- Lógica para colisão entre orbs e inimigos
-                    enemy.live = false -- Define que o inimigo não está mais vivo
-                    table.remove(enemies, j) -- Remove o inimigo da lista
+        -- Fisica das bolhas para matar o enemy
+        -- Verifica colisões entre orbs e inimigos
+        for i = #orbs, 1, -1 do
+            local orb = orbs[i]
+            for j = #enemies, 1, -1 do
+                local enemy = enemies[j]
+                if enemy and orb and enemy.live then
+                    if isCollidingOrbs(orb.x, orb.y, enemy.x, enemy.y, orbImage:getWidth() / 2, enemy.width / 2) then
+                        -- Lógica para colisão entre orbs e inimigos
+                        enemy.live = false       -- Define que o inimigo não está mais vivo
+                        table.remove(enemies, j) -- Remove o inimigo da lista
+                        contadorMortes = contadorMortes + 1
+                    end
                 end
-                
+            end
+        end
+
+        -- Atualiza o temporizador de mudança de cor
+        if colorTimer > 0 then
+            colorTimer = colorTimer - dt / 0.7
+            if colorTimer <= 0 then
+                -- Restaura a cor original
+                love.graphics.setColor(originalColor)
             end
         end
     end
 end
 
 function love.draw()
-    -- Renderização dos elementos na tela
-
     cam:attach() -- Anexa a câmera
 
     -- Desenha as camadas do mapa
@@ -289,6 +315,22 @@ function love.draw()
 
     -- Desenha as vidas do jogador
     for i = 1, player.lives do
-        love.graphics.rectangle("fill", 10 + (i - 1) * 20, 10, 10, 10)
+        love.graphics.draw(vidas, 10 + (i - 1) * (vidas:getWidth() + 5), 10) -- Desenha os corações com um espaçamento de 5 pixels entre eles
+    end
+
+    -- Exibe o contador de mortes na tela
+    love.graphics.print("Mortes: " .. contadorMortes, 10, 30)
+
+    if isPaused then
+        love.graphics.setColor(0, 0, 0, 0.5)                                                                       -- Configura uma cor preta com transparência para a sobreposição
+        love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())                 -- Desenha um retângulo preto que cobre toda a tela
+        love.graphics.setColor(255, 255, 255)                                                                      -- Restaura a cor padrão para desenhar o texto de pausa
+        love.graphics.printf("Jogo pausado", 0, love.graphics.getHeight() / 2, love.graphics.getWidth(), "center") -- Desenha o texto de pausa no centro da tela
+    end
+end
+
+function love.keypressed(key)
+    if key == "p" then
+        isPaused = not isPaused
     end
 end
