@@ -3,6 +3,13 @@ function isColliding(x1, y1, w1, h1, x2, y2, w2, h2)
     return x1 < x2 + w2 and x1 + w1 > x2 and y1 < y2 + h2 and y1 + h1 > y2
 end
 
+function isCollidingOrbs(x1, y1, x2, y2, radius1, radius2)
+    local dx = x2 - x1
+    local dy = y2 - y1
+    local distance = math.sqrt(dx * dx + dy * dy)
+    return distance < radius1 + radius2
+end
+
 function randomPositionInMap()
     local x = math.random(0, gameMap.width * gameMap.tilewidth)
     local y = math.random(0, gameMap.height * gameMap.tileheight)
@@ -34,8 +41,8 @@ function love.load()
 
     player.collider:setFixedRotation(true)                                                             -- Faz com que a colisão do jogador não gire
     player.lives = 3                                                                                   -- Define a quantidade de vidas do jogador
-    player.x = 400                                                                                     -- Posição inicial X do jogador
-    player.y = 200                                                                                     -- Posição inicial Y do jogador
+    player.x = (gameMap.width * gameMap.tilewidth) / 2                                                   -- Posição inicial X do jogador (centro do mapa)
+    player.y = (gameMap.height * gameMap.tileheight) / 2                                                                                      -- Posição inicial Y do jogador
     player.speed = 80                                                                                  -- Velocidade de movimento do jogador
     player.width = 48                                                                                  -- Largura do jogador
     player.height = 64                                                                                 -- Altura do jogador
@@ -59,7 +66,7 @@ function love.load()
     enemies = {} -- Tabela para armazenar os inimigos
 
     -- Gera 10 inimigos em posições aleatórias
-    for i = 1, 10 do
+    for i = 1, 20 do
         local enemy = {}
         enemy.x, enemy.y = randomPositionInMap()
         -- Restante das configurações do inimigo, como velocidade, dimensões, etc.
@@ -230,7 +237,22 @@ function love.update(dt)
         cam.y = (mapH - h / 2)
     end
 
-    
+    -- Fisica das bolhas para matar o enemy
+    -- Verifica colisões entre orbs e inimigos
+    for i = #orbs, 1, -1 do
+        local orb = orbs[i]
+        for j = #enemies, 1, -1 do
+            local enemy = enemies[j]
+            if enemy and orb and enemy.live then
+                if isCollidingOrbs(orb.x, orb.y, enemy.x, enemy.y, orbImage:getWidth() / 2, enemy.width / 2) then
+                    -- Lógica para colisão entre orbs e inimigos
+                    enemy.live = false -- Define que o inimigo não está mais vivo
+                    table.remove(enemies, j) -- Remove o inimigo da lista
+                end
+                
+            end
+        end
+    end
 end
 
 function love.draw()
