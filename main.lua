@@ -16,6 +16,11 @@ function randomPositionInMap()
     return x, y
 end
 
+function drawRandomBamboo()
+    local x, y = randomPositionInMap()
+    love.graphics.draw(bambu, x, y)
+end
+
 function love.load()
     -- imagem vida
     vidas = love.graphics.newImage('sprites/heart.png')
@@ -36,6 +41,11 @@ function love.load()
     camera = require 'libraries/camera'
     cam = camera() -- Cria uma nova câmera
 
+    -- Carrega a imagem do bambu
+    bambuImage = love.graphics.newImage('sprites/bamboo.png')
+    -- Variável para controlar o temporizador do bambu
+    bambuTimer = 0
+
     -- Inicialização do jogador
     player = {}
     player.collider = world:newBSGRectangleCollider(400, 250, 60, 90, 15)                              -- Define um retângulo de colisão para o jogador
@@ -43,9 +53,9 @@ function love.load()
     player.collider:setFixedRotation(true)                                                             -- Faz com que a colisão do jogador não gire
     player.lives = 3                                                                                   -- Define a quantidade de vidas do jogador
     player.x = (gameMap.width * gameMap.tilewidth) /
-    2                                                                                                  -- Posição inicial X do jogador (centro do mapa)
+        2                                                                                              -- Posição inicial X do jogador (centro do mapa)
     player.y = (gameMap.height * gameMap.tileheight) /
-    2                                                                                                  -- Posição inicial Y do jogador
+        2                                                                                              -- Posição inicial Y do jogador
     player.speed = 80                                                                                  -- Velocidade de movimento do jogador
     player.width = 48                                                                                  -- Largura do jogador
     player.height = 64                                                                                 -- Altura do jogador
@@ -132,11 +142,20 @@ function love.load()
 
     -- Variável para controlar a pausa
     isPaused = false
+
+    -- Criação dos bambus
+    bamboos = {}
+    for i = 1, 20 do
+        local bambu = {}
+        bambu.x, bambu.y = randomPositionInMap()
+        bambu.live = true
+        table.insert(bamboos, bambu)
+    end
 end
 
 local isPaused = false
 local colorTimer = 0
-local colorDuration = 0.5             -- Duração em segundos para a mudança de cor
+local colorDuration = 0.5               -- Duração em segundos para a mudança de cor
 local originalColor = { 255, 255, 255 } -- Cor original do jogador
 
 function love.update(dt)
@@ -280,6 +299,18 @@ function love.update(dt)
                 love.graphics.setColor(originalColor)
             end
         end
+
+        -- Atualiza o temporizador do bambu
+        bambuTimer = bambuTimer + dt
+
+        -- Geração de bambus
+        if bambuTimer >= 11 then
+            for i = 1, 5 do
+                local x, y = randomPositionInMap()
+                table.insert(bamboos, { x = x, y = y, live = true })
+            end
+            bambuTimer = 0
+        end
     end
 end
 
@@ -311,6 +342,13 @@ function love.draw()
 
     gameMap:drawLayer(gameMap.layers["arvores2"])
 
+    -- Desenha os bambus
+    for _, bambu in ipairs(bamboos) do
+        if bambu.live then
+            love.graphics.draw(bambuImage, bambu.x, bambu.y)
+        end
+    end
+
     cam:detach() -- Desanexa a câmera
 
     -- Desenha as vidas do jogador
@@ -327,6 +365,8 @@ function love.draw()
         love.graphics.setColor(255, 255, 255)                                                                      -- Restaura a cor padrão para desenhar o texto de pausa
         love.graphics.printf("Jogo pausado", 0, love.graphics.getHeight() / 2, love.graphics.getWidth(), "center") -- Desenha o texto de pausa no centro da tela
     end
+
+    love.graphics.print("Time: " .. math.floor(bambuTimer), 500, 500)
 end
 
 function love.keypressed(key)
